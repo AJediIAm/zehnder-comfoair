@@ -274,6 +274,7 @@ sensor:
   modbus_controller_id: modbus_device
   name: "Analog (0-10V) input voltage"
   id: zehnder_analog_input_voltage
+  entity_category: "diagnostic"
   register_type: holding
   address: 0x13C
   unit_of_measurement: "V"
@@ -288,6 +289,7 @@ sensor:
   modbus_controller_id: modbus_device
   name: "RF input voltage"
   id: zehnder_rf_input_voltage
+  entity_category: "diagnostic"
   register_type: holding
   address: 0x13D
   unit_of_measurement: "V"
