@@ -486,6 +486,7 @@ binary_sensor:
   id: zehnder_fireplace_mode_internal
 - platform: template
   name: Fireplace mode
+  entity_category: "diagnostic"
   id: zehnder_fireplace_mode
   lambda: |-
     if (id(zehnder_firmware_version_raw).state > 19999) { // only available on firmware 2.0.0+
