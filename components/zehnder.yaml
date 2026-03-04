@@ -453,6 +453,7 @@ binary_sensor:
 - platform: template
   name: "Bypass"
   id: zehnder_bypass
+  icon: mdi:valve
   device_class: opening
   lambda: |-
     if (id(zehnder_bypass_position).state > 0) {
