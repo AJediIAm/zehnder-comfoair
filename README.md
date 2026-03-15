@@ -75,7 +75,10 @@ The following schematic shows how to connect the hardware.
                         +--------------------+       +-------------+
 ```
 
-### Example of minimal configuration yaml
+### Example — minimal configuration
+Minimal ESPHome configuration required to use this component. Example files for other boards and setups are available in the [examples](examples) directory — adjust pins and secrets (Wi‑Fi, API/OTA keys) to match your hardware.
+
+Basic configuration (ESP8266 example):
 
 ```yaml
 substitutions:
@@ -84,8 +87,9 @@ substitutions:
   update_interval: 15s
   fan_output: fan_output
 
-# modbus: # uncomment for MAX485 chip without automatic flow control
-#   flow_control_pin: GPIO05
+# If your MAX485 module does not have automatic flow control, uncomment and set a flow control pin:
+# modbus:
+#   flow_control_pin: GPIO16
 
 packages:
   remote_package:
@@ -94,15 +98,15 @@ packages:
     files: [components/zehnder.yaml,
             components/fan.yaml] # comment out the fan.yaml if you don't want fan control
     refresh: 0s
-    
-output: 
-- platform: esp8266_pwm
-  pin: GPIO5
-  frequency: 1kHz
-  id: fan_output
+
+output:
+  - platform: esp8266_pwm
+    pin: GPIO5
+    frequency: 1kHz
+    id: fan_output
 
 logger:
-  baud_rate: 0 # disable logger for hardware UART support
+  baud_rate: 0    # required on ESP8266 if using hardware UART for RS485
 ```
 
 On ESP32 the output can be configured as follows:
@@ -113,6 +117,11 @@ output:
     pin: GPIO25
     id: fan_output
 ```
+
+Notes:
+- Verify GPIO pins match your board and wiring.
+- If using a MAX485 without automatic flow control, enable the modbus.flow_control_pin entry above.
+- Use the examples/ folder as starting points for other configurations and hardware variants.
 
 ### Registry table
 The following data fields have been identified from the holding registers. Currently, all registers are read-only.
