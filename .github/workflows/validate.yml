@@ -29,7 +29,7 @@ jobs:
 
       # Step 2: Validate all YAML files in the repo
       - name: Run ESPHome Valaidate
-        uses: esphome/build-action@v6
+        uses: esphome/build-action@v7
         with:
           version: latest
           # This will look for all .yaml files in the root or a 'devices' folder
