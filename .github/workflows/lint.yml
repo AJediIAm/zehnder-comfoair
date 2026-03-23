@@ -1,23 +1,40 @@
 # This is a basic workflow to help you get started with Actions
-
-name: CI
+name: Lint
 
 # Controls when the workflow will run
-on: push
+on:
+  push:
+    branches: 
+      - "main"
+  pull_request:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "lint"
-  lint:
+  # This workflow performs a spellcheck
+  run-codespell:
+    name: CodeSpell
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # complete all jobs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: CodeSpell
+        uses: codespell-project/actions-codespell@v2
+        with:
+          skip: cs.json,de.json,nl.json,pl.json # skip these files
+          ignore_words_list: hass # skip these words
+
+  # This workflow contains a single job called "lint"
+  run-lint:
+    name: YamlLint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # complete all jobs
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install yamllint
-        run: pip install yamllint
-
-      - name: Lint YAML files
-        run: yamllint .
+      - name: yaml-lint
+        uses: ibiqlik/action-yamllint@v3
