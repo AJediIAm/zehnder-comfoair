@@ -35,6 +35,6 @@ jobs:
     strategy:
       fail-fast: false # complete all jobs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: yaml-lint
         uses: ibiqlik/action-yamllint@v3
