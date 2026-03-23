@@ -1,0 +1,197 @@
+substitutions:
+  fan_speed_count: "3"
+
+globals:
+  - id: software_request
+    type: float
+    restore_value: yes      # Remembers your UI setting after a power cut
+    initial_value: '0.5'
+  - id: hardware_request
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: is_syncing
+    type: bool
+    initial_value: 'false'  # Prevents the feedback loop during UI updates
+  - id: pre_boost_fan_speed
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: boost_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+binary_sensor:
+  - platform: template
+    id: fan_fault_sensor
+    lambda: |-
+      return id(zehnder_status).state != "Normal";
+
+script:
+  - id: sync_fan_logic
+    mode: restart
+    then:
+      - lambda: |-
+          float soft = id(software_request);
+          float phys = id(hardware_request);
+          float ui_max = max(soft, phys);
+          
+          // 1. Show fan entity as "Off" when there is a fault
+          if (id(fan_fault_sensor).state) {        
+            // Update UI to "Off"
+            id(is_syncing) = true;
+            auto call = id(zehnder_fan).make_call();
+            call.set_state(false); // This shows the fan as "Off" in HA
+            call.perform();
+            id(is_syncing) = false;
+            return; // Stop execution here
+          }
+
+          // 2. Normal Operation (No Fault)
+          id(${fan_output}).set_level(soft);
+
+          // Helper to map ui_max in [0,1] to template fan speed 1..${fan_speed_count}
+          auto map_speed = [&](float level)->int {
+            int sc = ${fan_speed_count};
+            if (sc <= 1) return 1;
+            // If level is essentially zero treat as first step
+            if (level <= 0.0) return 1;
+            // Map level [0,1] to indices [1, sc], floor to nearest index
+            int idx = 1 + (int)floor(level * (sc - 1));
+            if (idx < 1) idx = 1;
+            if (idx > sc) idx = sc;
+            return idx;
+          };
+
+          id(is_syncing) = true;
+          auto call = id(zehnder_fan).make_call();
+          call.set_state(true);
+          call.set_speed(map_speed(ui_max));
+          call.perform();
+          id(is_syncing) = false;
+
+  - id: boost_start
+    then:
+      - lambda: |-
+          // 1. Save current state
+          id(pre_boost_fan_speed) = id(zehnder_fan).speed;
+      
+          // 2. Activate Boost
+          id(software_request) = 1.0;
+          id(boost_active) = true;
+          id(sync_fan_logic)->execute();
+
+  - id: boost_stop
+    then:
+      - fan.turn_on:
+          id: zehnder_fan
+          speed: !lambda 'id(boost_active) = false;
+                          return id(pre_boost_fan_speed);'
+
+  - id: boost_timer_script
+    mode: restart
+    parameters:
+      delay_min: int
+    then:
+      # 1. Save current state and activate boost
+      - switch.turn_on: zehnder_boost
+
+      # 2. Wait
+      - delay: !lambda return delay_min*60000;
+      
+      # 3. Revert to old state
+      - switch.turn_off: zehnder_boost
+
+button:
+  - platform: template
+    name: "Max (10 min)"
+    id: zehnder_boost_10
+    icon: mdi:fast-forward-10
+    on_press:
+      then:
+        - script.execute: 
+            id: boost_timer_script
+            delay_min: 10
+  - platform: template
+    name: "Max (30 min)"
+    id: zehnder_boost_30
+    icon: mdi:fast-forward-30
+    on_press:
+      then:
+        - script.execute: 
+            id: boost_timer_script
+            delay_min: 30
+  - platform: template
+    name: "Max (60 min)"
+    id: zehnder_boost_60
+    icon: mdi:fast-forward-60
+    on_press:
+      then:
+        - script.execute: 
+            id: boost_timer_script
+            delay_min: 60
+
+switch:
+  - platform: template
+    name: "Boost"
+    id: zehnder_boost
+    icon: mdi:fan-speed-3
+    optimistic: true
+    on_turn_on:
+      - script.execute: boost_start
+    on_turn_off:
+      - script.execute: boost_stop
+
+fan:
+  - platform: template
+    name: "Fan"
+    id: zehnder_fan
+    speed_count: ${fan_speed_count}
+    on_turn_on:
+      - lambda: |-
+          if (id(fan_fault_sensor).state) {
+            id(sync_fan_logic)->execute(); // Force UI back to Off
+          }
+    on_speed_set:
+      then:
+        - lambda: |-
+            // If the script is the one changing the speed, do nothing!
+            if (id(is_syncing)) return; 
+
+            if (id(boost_active)) {
+              id(zehnder_boost).turn_off();
+            }
+
+            // Map user speed x in [1, ${fan_speed_count}] to software_request in [0,1]
+            {
+              int sc = ${fan_speed_count};
+              if (sc <= 1) {
+                id(software_request) = 1.0;
+              } else {
+                // Normalize x in [1..sc] to [0..1]
+                id(software_request) = float(x - 1) / float(sc - 1);
+              }
+            }
+            
+            id(sync_fan_logic)->execute();
+
+sensor:
+- platform: combination
+  id: physical_switch_level
+  type: max
+  sources:
+    - source: zehnder_rf_control_setpoint
+    - source: zehnder_three_way_control_setpoint
+    - source: zehnder_bathroom_control_setpoint
+  on_value:
+      then:
+        - lambda: |-
+            // Update the hardware tracker
+            if (x <= 10) id(hardware_request) = 0.0;
+            else if (x <= 60) id(hardware_request) = 0.5;
+            else id(hardware_request) = 1.0;
+            
+            // Note: We do NOT set the hardware here, 
+            // but we run the script to update the UI.
+            id(sync_fan_logic)->execute();
