@@ -33,4 +33,4 @@ jobs:
         with:
           version: latest
           # This will look for all .yaml files in the root or a 'devices' folder
-          yaml-file: "examples/esp32.yaml"
+          yaml-file: ${{ github.workspace }}/examples/esp32.yaml
